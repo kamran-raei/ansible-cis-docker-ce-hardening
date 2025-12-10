@@ -47,8 +47,12 @@ default_ulimits_nofile_hard: 200
 default_ulimits_nproc_soft: 1024
 default_ulimits_nproc_hard: 2048
 
+docker_remaped_user: "sadra:165536:65536"
+docker_remaped_group: "sadra:165536:65536"
+
 syslog_address: ''
 seccomp_profile: ''
 authorization_plugins: []
 
 
+registry_certificates_dir: ""

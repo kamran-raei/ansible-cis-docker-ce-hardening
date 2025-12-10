@@ -8,82 +8,116 @@
    content: {}
   when: st.stat.exists == False
 
-- name: "2.1 Ensure network traffic is restricted between containers on the default bridge (Scored)"
-  jsonpatch: 
+- name: 2.1 Run the Docker daemon as a non-root user, if possible (Manual)
+  assert:
+    that:
+      - docker_user.stdout != "root"
+    fail_msg: "Docker daemon is running as ROOT! This violates CIS 2.1."
+    success_msg: "Docker daemon is running as non-root user: {{ docker_user.stdout }}"
+  vars:
+    docker_user: >
+      {{
+        lookup('pipe', "pgrep dockerd | xargs -r ps -o user= -p | head -n 1")
+      }}
+  tags:
+   - scored
+   - section2.1
+
+- name: "2.2 Ensure network traffic is restricted between containers on the default bridge (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: icc
     value: false
   notify: Reload docker
   tags:
    - scored
-   - section2.1
+   - section2.2
 
-- name: "2.2 Ensure the logging level is set to 'info' (Scored)"
-  jsonpatch: 
+- name: "2.3 Ensure the logging level is set to 'info' (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: log-level
     value: info
   notify: Reload docker
   tags:
    - scored
-   - section2.2
+   - section2.3
 
-- name: "2.3 Ensure Docker is allowed to make changes to iptables (Scored)"
-  jsonpatch: 
+- name: "2.4 Ensure Docker is allowed to make changes to iptables (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: iptables
     value: true
   notify: Reload docker
   tags:
    - scored
-   - section2.3
+   - section2.4
 
-- name: "2.4 Ensure insecure registries are not used (Scored)"
-  jsonpatch: 
+- name: "2.5 Ensure insecure registries are not used (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: insecure-registries
     state: absent
   notify: Reload docker
   tags:
    - scored
-   - section2.4
+   - section2.5
 
-- name: "2.5 Ensure aufs storage driver is not used (Scored)"
-  debug:
-    msg: "'aufs' not used as storage driver for your Docker instance."
+- name: 2.6 Ensure aufs storage driver is not used (Manual)
+  assert:
+    that:
+      - (docker_info.stdout | from_json).Driver != "aufs"
+    fail_msg: "Docker is using the AUFS storage driver! This is not allowed by CIS."
+    success_msg: "Docker storage driver is OK: {{ (docker_info.stdout | from_json).Driver }}"
+  vars:
+    docker_info: "{{ lookup('pipe', 'docker info --format json') }}"
   notify: Reload docker
   tags:
    - scored
-   - section2.5
+   - section2.6
+
+- name: 2.7 Ensure devicemapper storage driver is not used (Manual)
+  assert:
+    that:
+      - (docker_info.stdout | from_json).Driver != "devicemapper"
+    fail_msg: "Docker is using the devicemapper storage driver! This is not allowed by CIS."
+    success_msg: "Docker storage driver is OK: {{ (docker_info.stdout | from_json).Driver }}"
+  vars:
+    docker_info: "{{ lookup('pipe', 'docker info --format json') }}"
+  notify: Reload docker
+  tags:
+   - scored
+   - section2.7
+
 
 - block:
     - name: Include Docker daemon configuration
       import_tasks: tls_certs.yml
       when: section_2 | bool
 
-    - name: "2.6 Ensure TLS authentication for Docker daemon is configured (Scored)"
-      jsonpatch: 
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+      jsonpatch:
         file: "{{ config_file }}"
         key: tlsverify
         value: true
       notify: Reload docker
 
-    - name: "2.6 Ensure TLS authentication for Docker daemon is configured (Scored)"
-      jsonpatch: 
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+      jsonpatch:
         file: "{{ config_file }}"
         key: tlscacert
         value: "{{ server_cert_path }}/{{ ca_cert }}"
       notify: Reload docker
 
-    - name: "2.6 Ensure TLS authentication for Docker daemon is configured (Scored)"
-      jsonpatch: 
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+      jsonpatch:
         file: "{{ config_file }}"
         key: tlscert
         value: "{{ server_cert_path }}/{{ server_cert }}"
       notify: Reload docker
 
-    - name: "2.6 Ensure TLS authentication for Docker daemon is configured (Scored)"
-      jsonpatch: 
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+      jsonpatch:
         file: "{{ config_file }}"
         key: tlskey
         value: "{{ server_cert_path }}/{{ server_cert_key }}"
@@ -93,8 +127,8 @@
    - scored
    - section2.6
 
-- name: "2.7 Ensure the default ulimit is configured appropriately (Not Scored)"
-  jsonpatch: 
+- name: "2.9 Ensure the default ulimit is configured appropriately (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: default-ulimits
     value: {
@@ -112,49 +146,82 @@
   notify: Reload docker
   tags:
    - not_scored
-   - section2.7
+   - section2.9
 
-# - name: "2.8 Enable user namespace support (Scored)"
-#   lineinfile:
-#     path: "{{ item }}"
-#     line: dockremap:231072:65536
-#   with_items:
-#     - /etc/subgid
-#     - /etc/subuid
-#   tags:
-#    - scored
-#    - section2.8
+- block:
+  - name: "2.10 Enable user namespace support (Automated)"
+    lineinfile:
+      path: "/etc/subuid"
+      line: {{ docker_remaped_user }}
+    tags:
+    - scored
+    - section2.10
 
-# - name: "2.8 Enable user namespace support (Scored)"
-#   jsonpatch: 
-#     file: "{{ config_file }}"
-#     key: userns-remap
-#     value: default
-#   notify: Reload docker
-#   tags:
-#    - scored
-#    - section2.8
+  - name: "2.10 Enable user namespace support (Automated)"
+    lineinfile:
+      path: "/etc/subgid"
+      line: {{ docker_remaped_group }}
+    tags:
+    - scored
+    - section2.10
 
-- name: "2.9 Ensure the default cgroup usage has been confirmed (Scored)"
-  jsonpatch: 
+  - name: "2.10 Enable user namespace support (Automated)"
+    vars:
+      docker_remap_user_id: "{{ docker_remaped_user.split(':')[0] }}"
+      docker_remap_group_id: "{{ docker_remaped_group.split(':')[0] }}"
+      docker_userns_remap_value: "{{ docker_remap_user_id }}:{{ docker_remap_group_id }}"
+    jsonpatch:
+      file: "{{ config_file }}"
+      operations:
+        - op: add
+          path: /userns-remap
+          value: "{{ docker_userns_remap_value }}"
+    notify: Reload docker
+    tags:
+      - scored
+      - section2.10
+
+
+- name: "2.11 Ensure the default cgroup usage has been confirmed (Manual)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: cgroup-parent
     value: /docker
   notify: Reload docker
   tags:
    - scored
-   - section2.9
+   - section2.11
 
-- name: "2.10 Ensure base device size is not changed until needed (Scored)"
-  debug:
-    msg: "base device size left at default as per guidance."
-  notify: Reload docker
+- name: "2.12 Ensure base device size is not changed until needed (Manual)"
+  block:
+    - name: Check daemon.json for dm.basesize
+      command: "jq '. + {}' /etc/docker/daemon.json"
+      register: daemon_json
+      ignore_errors: yes
+
+    - name: Check systemd docker service for dm.basesize
+      command: "systemctl cat docker"
+      register: systemd_docker
+      ignore_errors: yes
+
+    - name: Check /etc/default/docker for dm.basesize
+      shell: "grep -E 'dm.basesize' /etc/default/docker || true"
+      register: default_docker
+      changed_when: false
+
+    - name: Fail if dm.basesize is found
+      fail:
+        msg: "dm.basesize is set! This violates CIS recommendations."
+      when: >
+        (daemon_json.stdout is search('dm\\.basesize')) or
+        (systemd_docker.stdout is search('dm\\.basesize')) or
+        (default_docker.stdout != '')
   tags:
-   - scored
-   - section2.10
+    - scored
+    - section2.12
 
-- name: "2.11 Ensure that authorization for Docker client commands is enabled (Scored) (Not Implemented)"
-  jsonpatch: 
+- name: "2.13 Ensure that authorization for Docker client commands is enabled (Automated)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: authorization-plugins
     value: "{{ authorization_plugins }}"
@@ -162,18 +229,18 @@
   notify: Reload docker
   tags:
    - scored
-   - section2.11
+   - section2.13
 
-- name: "2.11 Ensure that authorization for Docker client commands is enabled (Scored) (Not Implemented)"
+- name: "2.13 Ensure that authorization for Docker client commands is enabled (Manual) (Not Implemented)"
   debug:
     msg: "Default TLS authorization set by 2.6"
   when: authorization_plugins is not defined or (authorization_plugins|length==0)
   tags:
    - scored
-   - section2.11
+   - section2.13
 
-- name: "2.12 Ensure centralized and remote logging is configured (Scored)"
-  jsonpatch: 
+- name: "2.14 Ensure centralized and remote logging is configured(Automated)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: log-opts
     value: { 'syslog-address': '{{ syslog_address }}' }
@@ -181,40 +248,40 @@
   notify: Reload docker
   tags:
    - scored
-   - section2.12
-
-- name: "2.13 Ensure operations on legacy registry (v1) are Disabled (Scored)"
-  jsonpatch: 
-    file: "{{ config_file }}"
-    key: disable-legacy-registry
-    value: true
-  notify: Reload docker
-  tags:
-   - scored
-   - section2.13
-
-- name: "2.14 Ensure live restore is Enabled (Scored)"
-  jsonpatch: 
-    file: "{{ config_file }}"
-    key: live-restore
-    value: true
-  notify: Reload docker
-  tags:
-   - scored
    - section2.14
 
-- name: "2.15 Ensure Userland Proxy is Disabled (Scored)"
-  jsonpatch: 
+- name: 2.15 Ensure containers are restricted from acquiring new privileges (Automated)
+  jsonpatch:
     file: "{{ config_file }}"
-    key: userland-proxy
-    value: false
+    key: no-new-privileges
+    value: "true"
   notify: Reload docker
   tags:
    - scored
    - section2.15
 
-- name: "2.16 Ensure daemon-wide custom seccomp profile is applied, if needed (Not Scored)"
-  jsonpatch: 
+- name: 2.16 Ensure live restore is enabled (Automated)
+  jsonpatch:
+    file: "{{ config_file }}"
+    key: live-restore
+    value: "true"
+  notify: Reload docker
+  tags:
+   - scored
+   - section2.16
+
+- name: 2.17 Ensure Userland Proxy is Disabled (Automated)
+  jsonpatch:
+    file: "{{ config_file }}"
+    key: userland-proxy
+    value: "false"
+  notify: Reload docker
+  tags:
+   - scored
+   - section2.17
+
+- name: 2.18 Ensure that a daemon-wide custom seccomp profile is applied if appropriate (Automated)
+  jsonpatch:
     file: "{{ config_file }}"
     key: seccomp-profile
     value: "{{ seccomp_profile }}"
@@ -222,10 +289,10 @@
   notify: Reload docker
   tags:
    - scored
-   - section2.16
+   - section2.18
 
-- name: "2.17 Ensure experimental features are avoided in production (Scored)"
-  jsonpatch: 
+- name: "2.19 Ensure that experimental features are not implemented in production (Automated)"
+  jsonpatch:
     file: "{{ config_file }}"
     key: experimental
     value: false
@@ -233,13 +300,3 @@
   tags:
    - scored
    - section2.17
-
-- name: "2.18 Ensure containers are restricted from acquiring new privileges (Scored)"
-  jsonpatch: 
-    file: "{{ config_file }}"
-    key: no-new-privileges
-    value: true
-  notify: Reload docker
-  tags:
-   - scored
-   - section2.18
