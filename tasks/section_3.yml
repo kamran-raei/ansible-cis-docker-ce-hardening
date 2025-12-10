@@ -73,22 +73,12 @@
     that:
       - item.stat.pw_name == "root"
       - item.stat.gr_name == "root"
-      - item.stat.mode | int(base=8) <= 0o444
-    fail_msg: "Certificate {{ item.path }} has wrong ownership or permissions"
-    success_msg: "Certificate {{ item.path }} ownership and permissions are OK"
+      - (item.stat.mode | int(base=8)) <= 0o444
+    fail_msg: "Certificate {{ item.stat.path }} has incorrect ownership or permissions"
+    success_msg: "Certificate {{ item.stat.path }} is OK"
   loop: "{{ registry_certificates_files.files }}"
   loop_control:
-    loop_var: item
-  vars:
-    ansible_become: true
-  tasks:
-    - name: "Get file stats for each certificate"
-      ansible.builtin.stat:
-        path: "{{ item.path }}"
-      register: item
-      loop: "{{ registry_certificates_files.files }}"
-      loop_control:
-        loop_var: item
+    label: "{{ item.stat.path }}"
   tags:
     - scored
     - section3.7

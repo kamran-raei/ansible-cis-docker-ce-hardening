@@ -1,12 +1,13 @@
 - name: 1.1.1 Ensure a separate partition for containers has been created (Manual)
-  debug: msg="This is a manual configuration"
   ansible.builtin.shell:
-    cmd: mountpoint -- "$(docker info -f '{{ .DockerRootDir }}')"
+    cmd: |
+      mountpoint -- "$(docker info -f '{{"{{"}} .DockerRootDir {{"}}"}}')"
   tags:
    - not_scored
    - section1.2
+  failed_when: false
 
-- name: 1.1.2 Ensure only trusted users are allowed to control Docker daemon (Manual)
+- name: 1.1.2 Ensure only trusted users are allowed to control Docker daemon (Automated)
   user:
     name: "{{ item }}"
     group: docker
@@ -25,7 +26,7 @@
   - scored
   - section1.1.3
 
-- name: 1.1.4 Ensure auditing is configured for Docker files and directories /run/containerd (Manual)
+- name: 1.1.4 Ensure auditing is configured for Docker files and directories /run/containerd (Automated)
   lineinfile:
     dest: /etc/audit/rules.d/audit.rules
     line: "-a exit,always -F path=/run/containerd -F perm=war -k docker"
@@ -35,21 +36,19 @@
    - scored
    - section1.1.4
 
-
-- name: 1.1.5 Ensure auditing is configured for Docker files and directories /var/lib/docker (Manual)
-  block:
-  - name: first line
-    ineinfile:
+- block:
+  - name: 1.1.5 Ensure auditing is configured for Docker files and directories /var/lib/docker (Automated)
+    lineinfile:
       dest: /etc/audit/rules.d/audit.rules
       line: "-a exit,always -F path=/var/lib/docker -F perm=war -k docker"
       state: present
-  - name: second line
-    ineinfile:
+  - name: 1.1.5 Ensure auditing is configured for Docker files and directories /var/lib/docker (Automated)
+    lineinfile:
       dest: /etc/audit/rules.d/audit.rules
       line: "-a exit,never -F dir=/var/lib/docker/volumes"
       state: present
-  - name: third line
-    ineinfile:
+  - name: 1.1.5 Ensure auditing is configured for Docker files and directories /var/lib/docker (Automated)
+    lineinfile:
       dest: /etc/audit/rules.d/audit.rules
       line: "-a exit,never -F dir=/var/lib/docker/overlay2"
       state: present
@@ -158,7 +157,7 @@
    - scored
    - section1.1.15
 
-- name: 1.1.16 Ensure auditing is configured for Docker files and directories - /usr/bin/containerd-shim-runc-v1 (Manual)
+- name: 1.1.16 Ensure auditing is configured for Docker files and directories - /usr/bin/containerd-shim-runc-v1 (Automated)
   lineinfile:
     dest: /etc/audit/rules.d/audit.rules
     line: "-w /usr/bin/containerd-shim-runc-v1 -k docker"

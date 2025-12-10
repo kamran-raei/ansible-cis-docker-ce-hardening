@@ -11,9 +11,9 @@
 - name: 2.1 Run the Docker daemon as a non-root user, if possible (Manual)
   assert:
     that:
-      - docker_user.stdout != "root"
+      - docker_user != "root"
     fail_msg: "Docker daemon is running as ROOT! This violates CIS 2.1."
-    success_msg: "Docker daemon is running as non-root user: {{ docker_user.stdout }}"
+    success_msg: "Docker daemon is running as non-root user: {{ docker_user }}"
   vars:
     docker_user: >
       {{
@@ -33,7 +33,7 @@
    - scored
    - section2.2
 
-- name: "2.3 Ensure the logging level is set to 'info' (Manual)"
+- name: "2.3 Ensure the logging level is set to 'info' (Automated)"
   jsonpatch:
     file: "{{ config_file }}"
     key: log-level
@@ -43,7 +43,7 @@
    - scored
    - section2.3
 
-- name: "2.4 Ensure Docker is allowed to make changes to iptables (Manual)"
+- name: "2.4 Ensure Docker is allowed to make changes to iptables (Automated)"
   jsonpatch:
     file: "{{ config_file }}"
     key: iptables
@@ -53,7 +53,7 @@
    - scored
    - section2.4
 
-- name: "2.5 Ensure insecure registries are not used (Manual)"
+- name: "2.5 Ensure insecure registries are not used (Automated)"
   jsonpatch:
     file: "{{ config_file }}"
     key: insecure-registries
@@ -66,9 +66,9 @@
 - name: 2.6 Ensure aufs storage driver is not used (Manual)
   assert:
     that:
-      - (docker_info.stdout | from_json).Driver != "aufs"
+      - docker_info.Driver != "aufs"
     fail_msg: "Docker is using the AUFS storage driver! This is not allowed by CIS."
-    success_msg: "Docker storage driver is OK: {{ (docker_info.stdout | from_json).Driver }}"
+    success_msg: "Docker storage driver is OK: {{ docker_info.Driver }}"
   vars:
     docker_info: "{{ lookup('pipe', 'docker info --format json') }}"
   notify: Reload docker
@@ -79,9 +79,9 @@
 - name: 2.7 Ensure devicemapper storage driver is not used (Manual)
   assert:
     that:
-      - (docker_info.stdout | from_json).Driver != "devicemapper"
+      - docker_info.Driver != "devicemapper"
     fail_msg: "Docker is using the devicemapper storage driver! This is not allowed by CIS."
-    success_msg: "Docker storage driver is OK: {{ (docker_info.stdout | from_json).Driver }}"
+    success_msg: "Docker storage driver is OK: {{ docker_info.Driver }}"
   vars:
     docker_info: "{{ lookup('pipe', 'docker info --format json') }}"
   notify: Reload docker
@@ -95,28 +95,28 @@
       import_tasks: tls_certs.yml
       when: section_2 | bool
 
-    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Automated)"
       jsonpatch:
         file: "{{ config_file }}"
         key: tlsverify
         value: true
       notify: Reload docker
 
-    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Automated)"
       jsonpatch:
         file: "{{ config_file }}"
         key: tlscacert
         value: "{{ server_cert_path }}/{{ ca_cert }}"
       notify: Reload docker
 
-    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Automated)"
       jsonpatch:
         file: "{{ config_file }}"
         key: tlscert
         value: "{{ server_cert_path }}/{{ server_cert }}"
       notify: Reload docker
 
-    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Manual)"
+    - name: "2.8 Ensure TLS authentication for Docker daemon is configured (Automated)"
       jsonpatch:
         file: "{{ config_file }}"
         key: tlskey
@@ -127,7 +127,7 @@
    - scored
    - section2.6
 
-- name: "2.9 Ensure the default ulimit is configured appropriately (Manual)"
+- name: "2.9 Ensure the default ulimit is configured appropriately (Automated)"
   jsonpatch:
     file: "{{ config_file }}"
     key: default-ulimits
@@ -152,7 +152,7 @@
   - name: "2.10 Enable user namespace support (Automated)"
     lineinfile:
       path: "/etc/subuid"
-      line: {{ docker_remaped_user }}
+      line: "{{ docker_remaped_user }}"
     tags:
     - scored
     - section2.10
@@ -160,7 +160,7 @@
   - name: "2.10 Enable user namespace support (Automated)"
     lineinfile:
       path: "/etc/subgid"
-      line: {{ docker_remaped_group }}
+      line: "{{ docker_remaped_group }}"
     tags:
     - scored
     - section2.10
@@ -172,17 +172,15 @@
       docker_userns_remap_value: "{{ docker_remap_user_id }}:{{ docker_remap_group_id }}"
     jsonpatch:
       file: "{{ config_file }}"
-      operations:
-        - op: add
-          path: /userns-remap
-          value: "{{ docker_userns_remap_value }}"
+      key: userns-remap
+      value: "{{ docker_userns_remap_value }}"
     notify: Reload docker
     tags:
       - scored
       - section2.10
 
 
-- name: "2.11 Ensure the default cgroup usage has been confirmed (Manual)"
+- name: "2.11 Ensure the default cgroup usage has been confirmed (Automated)"
   jsonpatch:
     file: "{{ config_file }}"
     key: cgroup-parent
