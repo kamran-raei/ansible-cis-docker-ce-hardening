@@ -1,184 +1,266 @@
-- name: 5.1 Ensure AppArmor Profile is Enabled (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.1 Ensure swarm mode is not Enabled, if not needed (Automated)
+  shell:
+    cmd: docker swarm leave
   tags:
    - scored
    - section5.1
+  failed_when: false
 
-- name: 5.2 Ensure SELinux security options are set, if applicable (Scored)
-  jsonpatch: 
+
+- name: 5.2 Ensure that, if applicable, an AppArmor Profile is enabled (Manual)
+  shell:
+    cmd: |
+          docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: AppArmorProfile={{"{{"}} .AppArmorProfile {{"}}"}}'
+  tags:
+   - scored
+   - section5.2
+
+- name: 5.3 Ensure that, if applicable, SELinux security options are set (Not Implemented)
+  jsonpatch:
     file: "{{ config_file }}"
     key: selinux-enabled
     value: true
   notify: Reload docker
   tags:
    - scored
-   - section5.2
-
-- name: 5.3 Ensure Linux Kernel Capabilities are restricted within containers (Scored)
-  debug: msg="This is configuration is set when containers are run"
-  tags:
-   - scored
    - section5.3
 
-- name: 5.4 Ensure privileged containers are not used (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.4 Ensure that Linux kernel capabilities are restricted within containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: CapAdd={{"{{"}} .HostConfig.CapAdd {{"}}"}} CapDrop={{"{{"}} .HostConfig.CapDrop {{"}}"}}'
   tags:
    - scored
    - section5.4
 
-- name: 5.5 Ensure sensitive host system directories are not mounted on containers (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.5 Ensure that privileged containers are not used (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Privileged={{"{{"}} .HostConfig.Privileged {{"}}"}}'
   tags:
    - scored
    - section5.5
 
-- name: 5.6 Ensure ssh is not run within containers (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.6 Ensure sensitive host system directories are not mounted on containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Volumes={{"{{"}} .Mounts {{"}}"}}'
   tags:
    - scored
    - section5.6
 
-- name: 5.7 Ensure privileged ports are not mapped within containers (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.7 Ensure sshd is not run within containers (Manual)
+  shell: |
+    docker ps -q | xargs -r -I{} sh -c "docker exec {} ps aux | grep '[s]shd' && echo {}"
+  register: containers_with_sshd
+  changed_when: false
+  failed_when: containers_with_sshd.stdout_lines | length > 0
   tags:
    - scored
    - section5.7
 
-- name: 5.8 Ensure only needed ports are open on the container (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.7 Ensure sshd is not run within containers (Manual)
+  debug:
+    msg: "Containers running sshd: {{ containers_with_sshd.stdout_lines }}"
+  when: containers_with_sshd.stdout_lines | length > 0
+
+- name: 5.8 Ensure privileged ports are not mapped within containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Ports={{"{{"}} .NetworkSettings.Ports {{"}}"}}'
   tags:
    - scored
    - section5.8
 
-- name: 5.9 Ensure the host's network namespace is not shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.9 Ensure that only needed ports are open on the container (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Ports={{"{{"}} .NetworkSettings.Ports {{"}}"}}'
   tags:
    - scored
    - section5.9
 
-- name: 5.10 Ensure memory usage for container is limited (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.10 Ensure that the host's network namespace is not shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: NetworkMode={{"{{"}} .HostConfig.NetworkMode {{"}}"}}'
   tags:
    - scored
    - section5.10
 
-- name: 5.11 Ensure CPU priority is set appropriately on the container (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.11 Ensure that the memory usage for containers is limited (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Memory={{"{{"}} .HostConfig.Memory {{"}}"}}'
   tags:
    - scored
    - section5.11
 
-- name: 5.12 Ensure the container's root filesystem is mounted as read only (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.12 Ensure that CPU priority is set appropriately on containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: CpuShares={{"{{"}} .HostConfig.CpuShares {{"}}"}}'
   tags:
    - scored
    - section5.12
 
-- name: 5.13 Ensure incoming container traffic is binded to a specific host interface (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.13 Ensure that the container's root filesystem is mounted as read only (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: ReadonlyRootfs={{"{{"}} .HostConfig.ReadonlyRootfs {{"}}"}}'
   tags:
    - scored
    - section5.13
 
-- name: 5.14 Ensure 'on-failure' container restart policy is set to '5' (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.14 Ensure that incoming container traffic is bound to a specific host interface (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Ports={{"{{"}} .NetworkSettings.Ports {{"}}"}}'
   tags:
    - scored
    - section5.14
 
-- name: 5.15 Ensure the host's process namespace is not shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.15 Ensure that the 'on-failure' container restart policy is set to '5' (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: RestartPolicyName={{"{{"}} .HostConfig.RestartPolicy.Name {{"}}"}} MaximumRetryCount={{"{{"}} .HostConfig.RestartPolicy.MaximumRetryCount {{"}}"}}'
   tags:
    - scored
    - section5.15
 
-- name: 5.16 Ensure the host's IPC namespace is not shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.16 Ensure that the host's process namespace is not shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: PidMode={{"{{"}} .HostConfig.PidMode {{"}}"}}'
   tags:
    - scored
    - section5.16
 
-- name: 5.17 Ensure host devices are not directly exposed to containers (Not Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.17 Ensure that the host's IPC namespace is not shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: IpcMode={{"{{"}} .HostConfig.IpcMode {{"}}"}}'
   tags:
-   - not_scored
+   - scored
    - section5.17
 
-- name: 5.18 Ensure the default ulimit is overwritten at runtime, only if needed (Not Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.18 Ensure that host devices are not directly exposed to containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Devices={{"{{"}} .HostConfig.Devices {{"}}"}}'
   tags:
    - not_scored
    - section5.18
 
-- name: 5.19 Ensure mount propagation mode is not set to shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.19 Ensure that the default ulimit is overwritten at runtime if needed (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Ulimits={{"{{"}} .HostConfig.Ulimits {{"}}"}}'
   tags:
-   - scored
+   - not_scored
    - section5.19
 
-- name: 5.20 Ensure the host's UTS namespace is not shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.20 Ensure mount propagation mode is not set to shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Propagation={{"{{"}} range $mnt := .Mounts {{"}}"}} {{"{{"}} json $mnt.Propagation {{"}}"}} {{"{{"}} end {{"}}"}}'
   tags:
    - scored
    - section5.20
 
-- name: 5.21 Ensure the default seccomp profile is not Disabled (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.21 Ensure that the host's UTS namespace is not shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: UTSMode={{"{{"}} .HostConfig.UTSMode {{"}}"}}'
   tags:
    - scored
    - section5.21
 
-- name: 5.22 Ensure docker exec commands are not used with privileged option (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.22 Ensure the default seccomp profile is not Disabled (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: SecurityOpt={{"{{"}} .HostConfig.SecurityOpt {{"}}"}}'
   tags:
    - scored
    - section5.22
 
-- name: 5.23 Ensure docker exec commands are not used with user option (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.23 Ensure that docker exec commands are not used with the privileged option (Manual)
+  shell:
+    cmd: "ausearch -k docker | grep exec | grep privileged"
   tags:
    - scored
    - section5.23
+  failed_when: false
 
-- name: 5.25 Ensure the container is restricted from acquiring additional privileges (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.24 Ensure that docker exec commands are not used with the user=root option (Manual)
+  shell:
+    cmd: "ausearch -k docker | grep exec | grep user"
+  tags:
+   - scored
+   - section5.24
+  failed_when: false
+
+- name: 5.25 Ensure that cgroup usage is confirmed (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: CgroupParent={{"{{"}} .HostConfig.CgroupParent {{"}}"}}'
   tags:
    - scored
    - section5.25
 
-- name: 5.26 Ensure container health is checked at runtime (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.26 Ensure that the container is restricted from acquiring additional privileges (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: SecurityOpt={{"{{"}} .HostConfig.SecurityOpt {{"}}"}}'
   tags:
    - scored
    - section5.26
 
-- name: 5.27 Ensure docker commands always get the latest version of the image (Not Scored)
+- name: 5.27 Ensure that container health is checked at runtime (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Health={{"{{"}} .State.Health.Status {{"}}"}}'
+  tags:
+   - scored
+   - section5.27
+  failed_when: false
+
+- name: 5.28 Ensure that Docker commands always make use of the latest version of their image (Manual)
   debug: msg="This is configuration is set when containers are run"
   tags:
    - not_scored
-   - section5.27
-
-- name: 5.28 Ensure PIDs cgroup limit is used (Scored)
-  debug: msg="This is configuration is set when containers are run"
-  tags:
-   - scored
    - section5.28
 
-- name: 5.29 Ensure Docker's default bridge docker0 is not used (Not Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.29 Ensure that the PIDs cgroup limit is used (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: PidsLimit={{"{{"}} .HostConfig.PidsLimit {{"}}"}}'
   tags:
    - scored
    - section5.29
 
-
-- name: 5.30 Ensure the host's user namespaces is not shared (Scored)
-  debug: msg="This is configuration is set when containers are run"
+- name: 5.30 Ensure that Docker's default bridge "docker0" is not used (Manual)
+  shell:
+    cmd: |
+        docker network ls --quiet | xargs docker network inspect --format '{{"{{"}} .Name {{"}}"}}: {{"{{"}} .Options {{"}}"}}'
   tags:
    - scored
    - section5.30
 
-- name: 5.31 Ensure the Docker socket is not mounted inside any containers (Scored)
-  debug: msg="This is configuration is set when containers are run"
+
+- name: 5.31 Ensure that the host's user namespaces are not shared (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: UsernsMode={{"{{"}} .HostConfig.UsernsMode {{"}}"}}'
   tags:
    - scored
    - section5.31
+
+- name: 5.32 Ensure that the Docker socket is not mounted inside any containers (Manual)
+  shell:
+    cmd: |
+        docker ps --quiet --all | xargs docker inspect --format '{{"{{"}} .Name {{"}}"}}: Volumes={{"{{"}} .Mounts {{"}}"}}' | grep docker.sock
+  tags:
+   - scored
+   - section5.32
+  failed_when: false

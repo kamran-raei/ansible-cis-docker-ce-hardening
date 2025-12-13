@@ -3,8 +3,8 @@
   register: res
 
 - name: |
-        "3.1 Ensure that docker.service file ownership is set to root:root (Scored)"
-        "3.2 Ensure that docker.service file permissions are set to 644 or more restrictive (Scored)"
+        "3.1 Ensure that the docker.service file ownership is set to root:root (Automated)"
+        "3.2 Ensure that docker.service file permissions are appropriately set (Automated)"
   file:
     path: /lib/systemd/system/docker.service
     owner: root
@@ -21,8 +21,8 @@
   register: res
 
 - name: |
-        "3.3 Ensure that docker.socket file ownership is set to root:root (Scored)"
-        "3.4 Ensure that docker.socket file permissions are set to 644 or more restrictive (Scored)"
+        "3.3 Ensure that docker.socket file ownership is set to root:root (Automated)"
+        "3.4 Ensure that docker.socket file permissions are set to 644 or more restrictive (Automated)"
   file:
     path: /usr/lib/systemd/system/docker.socket
     owner: root
@@ -40,8 +40,8 @@
   register: res
 
 - name: |
-        "3.5 Ensure that /etc/docker directory ownership is set to root:root (Scored)"
-        "3.6 Ensure that /etc/docker directory permissions are set to 755 or more restrictive (Scored)"
+        "3.5 Ensure that /etc/docker directory ownership is set to root:root (Automated)"
+        "3.6 Ensure that /etc/docker directory permissions are set to 755 or more restrictive (Automated)"
   file:
     path: /etc/docker
     owner: root
@@ -54,17 +54,43 @@
    - section3.5
    - section3.6
 
+- name: |
+        "3.7 Ensure that registry certificate file ownership is set to root:root (SemiAutomated)"
+        "3.8 Ensure that registry certificate file permissions are set to 444 or more restrictively (SemiAutomated)"
+  ansible.builtin.find:
+    paths: "{{ registry_certificates_dir }}"
+    file_type: file
+  register: registry_certificates_files
+  tags:
+    - scored
+    - section3.7
+    - section3.8
 
-# - name: |
-#         "3.7 Ensure that registry certificate file ownership is set to root:root (Scored)"
-#         "3.8 Ensure that registry certificate file permissions are set to 444 or more restrictive (Scored)"
+- name: |
+        "3.7 Ensure that registry certificate file ownership is set to root:root (SemiAutomated)"
+        "3.8 Ensure that registry certificate file permissions are set to 444 or more restrictively (SemiAutomated)"
+  ansible.builtin.assert:
+    that:
+      - item.stat.pw_name == "root"
+      - item.stat.gr_name == "root"
+      - (item.stat.mode | int(base=8)) <= 0o444
+    fail_msg: "Certificate {{ item.stat.path }} has incorrect ownership or permissions"
+    success_msg: "Certificate {{ item.stat.path }} is OK"
+  loop: "{{ registry_certificates_files.files }}"
+  loop_control:
+    label: "{{ item.stat.path }}"
+  tags:
+    - scored
+    - section3.7
+    - section3.8
+
 
 - stat: path="{{ server_cert_path }}/{{ ca_cert }}"
   register: res
 
 - name: |
-        "3.9 Ensure that TLS CA certificate file ownership is set to root:root (Scored)"
-        "3.10 Ensure that TLS CA certificate file permissions are set to 444 or more restrictive (Scored)"
+        "3.9 Ensure that TLS CA certificate file ownership is set to root:root (Automated)"
+        "3.10 Ensure that TLS CA certificate file permissions are set to 444 or more restrictively (Automated)"
   file:
     path: "{{ server_cert_path }}/{{ ca_cert }}"
     owner: root
@@ -82,8 +108,8 @@
   register: res
 
 - name: |
-        "3.11 Ensure that Docker server certificate file ownership is set to root:root (Scored)"
-        "3.12 Ensure that Docker server certificate file permissions are set to 444 or more restrictive (Scored)"
+        "3.11 Ensure that Docker server certificate file ownership is set to root:root (Automated)"
+        "3.12 Ensure that the Docker server certificate file permissions are set to 444 or more restrictively (Automated)"
   file:
     path: "{{ server_cert_path }}/{{ server_cert }}"
     owner: root
@@ -101,8 +127,8 @@
   register: res
 
 - name: |
-        "3.13 Ensure that Docker server certificate key file ownership is set to root:root (Scored)"
-        "3.14 Ensure that Docker server certificate key file permissions are set to 400 (Scored)"
+        "3.13 Ensure that the Docker server certificate key file ownership is set to root:root (Automated)"
+        "3.14 Ensure that the Docker server certificate key file permissions are set to 400 (Automated)"
   file:
     path: "{{ server_cert_path }}/{{ server_cert_key }}"
     owner: root
@@ -119,8 +145,8 @@
   register: res
 
 - name: |
-        "3.15 Ensure that Docker socket file ownership is set to root:docker (Scored)"
-        "3.16 Ensure that Docker socket file permissions are set to 660 or more restrictive (Scored)"
+        "3.15 Ensure that the Docker socket file ownership is set to root:docker (Automated)"
+        "3.16 Ensure that the Docker socket file permissions are set to 660 or more restrictively (Automated)"
   file:
     path: /var/run/docker.sock
     owner: root
@@ -138,8 +164,8 @@
   register: res
 
 - name: |
-        "3.17 Ensure that daemon.json file ownership is set to root:root (Scored)"
-        "3.18 Ensure that daemon.json file permissions are set to 644 or more restrictive (Scored)"
+        "3.17 Ensure that the daemon.json file ownership is set to root:root (Automated)"
+        "3.18 Ensure that daemon.json file permissions are set to 644 or more restrictive (Automated)"
   file:
     path: /etc/docker/daemon.json
     owner: root
@@ -157,8 +183,8 @@
   register: res
 
 - name: |
-        "3.19 Ensure that /etc/default/docker file ownership is set to root:root (Scored)"
-        "3.20 Ensure that /etc/default/docker file permissions are set to 644 or more restrictive (Scored)"
+        "3.19 Ensure that the /etc/default/docker file ownership is set to root:root (Automated)"
+        "3.20 Ensure that the /etc/default/docker file permissions are set to 644 or more restrictively (Automated)"
   file:
     path: /etc/default/docker
     owner: root
@@ -170,5 +196,41 @@
    - scored
    - section3.19
    - section3.20
+
+- stat: path=/etc/sysconfig/docker
+  register: res
+
+- name: |
+        "3.21 Ensure that the /etc/sysconfig/docker file permissions are set to 644 or more restrictively (Automated)"
+        "3.22 Ensure that the /etc/sysconfig/docker file ownership is set toroot:root (Automated)"
+  file:
+    path: /etc/sysconfig/docker
+    owner: root
+    group: root
+    mode: 0644
+    state: file
+  when: res.stat.exists == True
+  tags:
+   - scored
+   - section3.21
+   - section3.22
+
+- stat: path=/run/containerd/containerd.sock
+  register: res
+
+- name: |
+        "3.23 Ensure that the Containerd socket file ownership is set to root:root (Automated)"
+        "3.24 Ensure that the Containerd socket file permissions are set to 660 or more restrictively (Automated)"
+  file:
+    path: /run/containerd/containerd.sock
+    owner: root
+    group: root
+    mode: 0660
+    state: file
+  when: res.stat.exists == True
+  tags:
+   - scored
+   - section3.23
+   - section3.24
 
 
